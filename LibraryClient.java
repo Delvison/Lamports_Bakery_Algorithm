@@ -44,7 +44,12 @@ public class LibraryClient
 	private BufferedReader sockIn; // for reading in from the socket
 	private String configFile = ".clientConfig.dat"; // config file location
 	private HashMap<String,Boolean> servers; // < [addr:status], ...>
-	private String clientID;
+	private String clientID; // clientID given by server
+	private final String GREEN = "\033[92m";
+	private final String RED = "\033[91m";
+	private final String ENDC = "\033[0m";
+	private final String YELLOW = "\u001B[33m";
+	private final String BLUE = "\u001B[34m"; 
 
 	/**
 	 * Constructor method. Initializes the hashmap used to hold the addresses of
@@ -82,7 +87,7 @@ public class LibraryClient
 				String j = s.nextLine();
 				if (j.contains(":")) {
 					servers.put(j, true);
-					debug("added server "+j);
+					//debug("added server "+j);
 				}
 			}
 			// connect to a random server
@@ -103,9 +108,10 @@ public class LibraryClient
 	 */
 	private boolean connect()
 	{
-		debug("Entering connect()");
+		//debug("Entering connect()");
 		boolean isConnected = false;
 		this.isConnected = isConnected;
+		// FIXME: warning here with typecast
 		List<String> srvlist = new ArrayList(
 		Arrays.asList(servers.keySet().toArray()));
 		// randomize the server list
@@ -122,25 +128,27 @@ public class LibraryClient
 					String ip = s[0];
 					int port = Integer.parseInt(s[1]);
 					host = new Socket(ip,port);
-					debug("connect(): socket created on port "+host.getLocalPort());
+					//debug("connect(): socket created on port "+host.getLocalPort());
 					sockOut = new PrintWriter(host.getOutputStream(),true);
 					sockIn = new BufferedReader(
 					new InputStreamReader(host.getInputStream()));
+					// send identity notification
+					sockOut.println("client");
 					// receive ACK.
-					debug("connect(): attempting to connect to "+ip+":"+port);
+					//debug("connect(): attempting to connect to "+ip+":"+port);
 					char[] buffer = new char[64];
 					int r = sockIn.read(buffer,0,64);
 					if (r != 0) 
 					{
 						clientID = new String(buffer);
 						isConnected = true;
-						System.out.println("Connected to ... "+getIP(host)+" as "+clientID);
+						debug("Connected to "+getIP(host)+" as "+clientID, GREEN);
 					} else {
 						System.out.println("Failed to connect to... "+getIP(host));
 					}
 				} catch (Exception e) 
 				{
-					debug("connect():Exception on "+server);
+					debug("connect(): Exception on "+server, RED);
 					servers.put(server,false);
 					/* e.printStackTrace(); */
 				} 
@@ -164,11 +172,11 @@ public class LibraryClient
 			try 
 			{
 				sockOut.println(cmd);
-				debug("sent command: "+cmd);
+				debug("sent command: "+cmd,GREEN);
 				char[] buffer = new char[64];
 				int r = sockIn.read(buffer,0,buffer.length);
 				res = new String(buffer);
-				debug("received :"+res);
+				debug("received :"+res,BLUE);
 			} catch(IOException e) 
 			{
 				e.printStackTrace();
@@ -190,11 +198,19 @@ public class LibraryClient
 		Scanner in = new Scanner(System.in);
 		String cmd = "";
 		prompt();
+		// catch keyboardInterrupt
+		Runtime.getRuntime().addShutdownHook(new Thread() {
+				public void run() {
+					terminate();
+				}
+		 });
 		while (!((cmd = in.nextLine()).equals("quit")))
 		{
-			sendCmd(cmd);
-			prompt();
+			if (cmd.equals("reconnect")) { connect(); } 
+			else { sendCmd(cmd); }
+				prompt();
 		}
+		terminate();
 	}
 
 	/**
@@ -219,7 +235,12 @@ public class LibraryClient
 	 */
 	private void prompt()
 	{
-		System.out.print(" > ");
+		try{
+			String ip = host.getInetAddress().getLocalHost().getHostAddress();
+			System.out.print(ip+":"+host.getLocalPort()+" > ");
+		} catch (Exception e){
+			e.printStackTrace();
+		}
 	}
 
 	/**
@@ -241,6 +262,11 @@ public class LibraryClient
 	private void debug(String msg)
 	{
 		if (this.debug) System.out.println("[*] DEBUG: "+msg);
+	}
+	
+	private void debug(String msg, String color)
+	{
+		if (debug) System.out.println(color+"[*] DEBUG: "+msg+ENDC);
 	}
 
 	public static void main(String[] args)
