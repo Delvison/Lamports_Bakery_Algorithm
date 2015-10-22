@@ -45,32 +45,34 @@ import java.io.IOException;
  *
  * @author Delvison Castillo (delvison.castillo@sunykorea.ac.kr)
  *
- * TODO:  - initialize books from the file
- *				- implement timeout feature. extract own timeout value from configFile
+ * TODO:  - fix problem of mixed up messages when send rate is too fast by
+ *					framing each message sent.
  */
 public class LibraryServer
 
 {
 	private int port; // port number for the server to listen to
 	private boolean debug = true; // debug flag
-	private HashMap<String,Boolean> servers; // < [addr:status], ...>
+	private HashMap<String,Boolean> servers; // < [addr:status], > (unneccesary)
 	private ArrayList<SocketChannel> clients_sock; // client SocketChannels
 	private ArrayList<SocketChannel> servers_sock; // server SocketChannels
 	private String configFile = ".serverConfig.dat"; // configuration file
-	private ServerSocketChannel serverSocketCh;
+	private ServerSocketChannel serverSocketCh; // server socket
 	private File f; // configuration file object
-	private int clock; // lamport timestamp
 	private Selector selector; // for asynchronous I/O
 	private String[][] books; // data structure for books
 	private int bookNum; // number of books in the library
-	private int timeout; // time in milliseconds to become unresponsive
 	private int clientCount; // counter for how many clients connected
 	
 	// Lamports Mutex Algorithm variables
-	Integer[] processes; // process id's to identify servers
 	Boolean[] cs_flag; // critical section flag
 	Integer[] vector_clock; // clocks of all processes/servers
 	private int pid; // process id of the current server
+
+	// timeout values
+	private int messageMax;
+	private int messageCount;
+	private int timeout; // time in milliseconds to become unresponsive
 	
 	private final String GREEN = "\033[92m";
 	private final String RED = "\033[91m";
@@ -81,14 +83,13 @@ public class LibraryServer
 
 	/**
 	 * Constructor method. Initializes servers and clients data structures, calls
-	 * initialize method, enters the programs mainloop in initialize is
+	 * initialize method, enters the programs mainloop if initialize is
 	 * successful.
 	 */
 	public LibraryServer(int port)
 	{
 		this.port = port;
 		clientCount = 0;
-		clock = 0;
 		servers = new HashMap<String,Boolean>();
 		clients_sock = new ArrayList<SocketChannel>();
 		servers_sock = new ArrayList<SocketChannel>();
@@ -108,23 +109,22 @@ public class LibraryServer
 	{
 		try 
 		{
-			System.out.println("Initializing...127.0.0.1:"+port);
+			System.out.println("Initializing on port "+port+"...");
 			// create socket
 			serverSocketCh = ServerSocketChannel.open();
 			serverSocketCh.bind(new InetSocketAddress(port));
 			serverSocketCh.configureBlocking(false);
-			debug("Local IP -- "+serverSocketCh.socket().getInetAddress().
-			getLocalHost().getHostAddress());
-			// create selector (NIO)
-			selector = Selector.open();
+			/* debug("Local IP -- "+serverSocketCh.socket().getInetAddress(). */
+			/* getLocalHost().getHostAddress()); */
+			selector = Selector.open(); // selector used for nonblocking sockets
 			int interestSet = serverSocketCh.validOps();
 			SelectionKey key =serverSocketCh.register(selector, interestSet);
+
 			// read config file
 			f = new File(configFile);
 			Scanner s = new Scanner(f);
-			// n <- read in number of servers available
-			int servNum = s.nextInt();
-			debug("amount of servers: "+servNum);
+			int servNum = s.nextInt(); // number of servers available
+			/* debug("amount of servers: "+servNum); */
 
 			// initialize cs_flag
 			cs_flag = new Boolean[servNum];
@@ -138,19 +138,20 @@ public class LibraryServer
 			this.bookNum = s.nextInt();
 			debug("amount of books: "+bookNum);
 			books = new String[bookNum][3];
-			for (int i=0;i<bookNum;i++){
+			for (int i=0;i<bookNum;i++)
+			{
 				books[i][0] = "b"+i;
 				books[i][1] = "free";
 			}
 
 			// initialize servers
-			for (int i = 0;i<=servNum;i++) {
+			for (int i = 0;i<=servNum;i++) 
+			{
 				String j = s.nextLine();
 				if (j.contains(":")) {
-					//debug("read server from config: "+j);
-					if (Integer.parseInt(j.split(":")[1]) == this.port) {
-						// set process id
-						this.pid = i-1;
+					if (Integer.parseInt(j.split(":")[1]) == this.port) 
+					{
+						this.pid = i-1; // set process ID
 						debug("PID == "+pid,CYAN);
 					} else {
 						servers.put(j, true);
@@ -158,7 +159,16 @@ public class LibraryServer
 				}
 			}
 
-			// TODO: get sleep duration and sleep trigger
+			// get timeout parameters
+			while(s.hasNext())
+			{
+				String[] i = s.nextLine().split(" ");
+				int p = Integer.parseInt(i[0].substring(1,i[0].length())); //pid
+				if (p-1 == this.pid){
+					this.messageMax = Integer.parseInt(i[1]); // message limit
+					this.timeout = Integer.parseInt(i[2]); // timeout
+				}
+			}
 
 			// connect to servers
 		  return connectToServers() ? true : false;
@@ -195,7 +205,7 @@ public class LibraryServer
 				}
 			} catch (Exception e)
 			{
-				debug("connectToServers(): Error with "+server.getKey(),RED);
+				/* debug("connectToServers(): Error with "+server.getKey(),RED); */
 				servers.put(server.getKey(),false);
 				/* return false; */
 			}
@@ -218,9 +228,9 @@ public class LibraryServer
 			try
 			{
 				final byte[] by = msg.getBytes();
-				ByteBuffer b = ByteBuffer.allocate(by.length);
-				b.put(by);
-				b.flip();
+				ByteBuffer b = ByteBuffer.wrap(by);
+				/* b.put(by); */
+				/* b.flip(); */
 				while(b.hasRemaining()){
 					int p = sock.write(b);
 				}
@@ -250,10 +260,10 @@ public class LibraryServer
 	}
 
 	/**
-	 * Receives a connection from a client. Sends client an ACK. 
-	 * Adds client's socket to the client data structure.
-	 * @param Socket c_sock - The newly created socket for the connecting client
-	 * produced from ServerSocket.accept().
+	 * Receives a connection from a client or a server, sends appropriate ACK and
+	 * adds the socket to the appropriate data structure.
+	 * @param Socket clientCh - The newly created socket produced from 
+	 * ServerSocketChannel.accept().
 	 * @return Boolean indicating whether or not the client was successfully
 	 * added.
 	 */
@@ -278,8 +288,9 @@ public class LibraryServer
 					broadcast("CLIENT_COUNT "+this.pid+" "+clientCount+" "+
 					vector_clock[this.pid]);
 					return true;
+				
+				// server is connecting
 				} else {
-					// server is connecting
 					debug("connectClient(): connected to server: "+recv,CYAN);
 					servers_sock.add(clientCh);
 					clientCh.configureBlocking(false);
@@ -298,7 +309,7 @@ public class LibraryServer
 	}
 
 	/**
-	 * Receives a command on the socket from a client.
+	 * Receives a command on the socket from a client or server.
 	 * @param SocketChannel sock - SocketChannel receiving from.
 	 * @return String containing the reply to be sent to the client.
 	 */
@@ -386,8 +397,9 @@ public class LibraryServer
 			}
 		} catch (IOException e)
 		{
-			debug("recv():IOException.");
-			e.printStackTrace();
+			debug("recv():IOException. Message corrupted due to transmission "+
+			"speed or there is a connection problem.",RED);
+			/* e.printStackTrace(); */
 		}
 		return recv;
 	}
@@ -416,7 +428,7 @@ public class LibraryServer
 	 */
 	private void broadcast(String msg)
 	{
-		debug("broadcast(): MESSAGE = "+msg);
+		/* debug("broadcast(): MESSAGE = "+msg); */
 		for (SocketChannel sock: servers_sock)
 		{
 			send(sock,msg);
@@ -424,8 +436,9 @@ public class LibraryServer
 	}
 
 	/**
-	* Updates the clock value to be the maximum value found in the vector clock 
-	* plus 1.
+	* Updates the clock value of a given process.
+	* @param int process - ID of process to update clock value for. 
+	* @param int val - value to update the process's clock to.
 	*/
 	private void updateClock(int process, int val)
 	{
@@ -433,6 +446,7 @@ public class LibraryServer
 		{
 			int max = (int) Collections.max(Arrays.asList(vector_clock));
 			vector_clock[process] = max + 1;
+			messageCount ++;
 		} else {
 			if(vector_clock[process] < val) vector_clock[process] = val;
 		}
@@ -448,9 +462,9 @@ public class LibraryServer
 	*	@param String cmd - command being submitted (reserve or return).
 	*	@param boolean needLock - inidicates whether or not the process requires a
 	*	lock for the critical section. The difference is updating books from a
-	*	client request, which requires a lock, or just synchronizing with other
+	*	client request, which requires a lock, to just synchronizing with other
 	*	servers.
-	*	@return String - response to command submitted.
+	*	@return String response to command submitted.
 	*/
 	private String processBook(String clientID, String bookID, String cmd, 
 	boolean needLock)
@@ -481,7 +495,11 @@ public class LibraryServer
 					}
 				}
 			}
-			debug("processBook(): "+ret);
+			if (needLock){
+				debug("processBook(): PROCESSING "+ret);
+			} else {
+				debug("processBook(): SYNCHRONIZING "+ret,CYAN);
+			}
 			if (needLock && !ret.substring(0,4).equals("fail")) 
 				broadcast("COMMAND "+this.pid+" "+vector_clock[this.pid]+
 				" "+cmd+" "+clientID+" "+bookID);
@@ -496,9 +514,12 @@ public class LibraryServer
 	 */
 	private void lock(int process)
 	{
-		debug("lock(): setting lock for process "+process,YELLOW);
-		if (this.pid == process) broadcast("LOCK "+this.pid+" "+
-			vector_clock[this.pid]);
+		if (this.pid == process) { 
+			debug("lock(): setting lock for process "+process,YELLOW);
+			broadcast("LOCK "+this.pid+" "+vector_clock[this.pid]);
+		} else {
+			debug("lock(): setting lock for process "+process,CYAN);
+		}
 		cs_flag[process] = true;
 	}
 
@@ -508,11 +529,13 @@ public class LibraryServer
 	 */
 	private void unlock(int process)
 	{
-		debug("unlock(): unlocking process "+process,YELLOW);
 		cs_flag[process] = false;
 		updateClock(process, vector_clock[process]);
 		if (this.pid == process) {
+			debug("unlock(): unlocking process "+process,YELLOW);
 			broadcast("UNLOCK "+this.pid+" "+vector_clock[this.pid]);
+		} else {
+			debug("unlock(): unlocking process "+process,CYAN);
 		}
 	}
 	
@@ -542,7 +565,7 @@ public class LibraryServer
 			if (lowestClock == vector_clock[this.pid] && !othersWaiting ||
 					this.pid <= lowestProcessWaiting) 
 			{
-				// if others are not waiting and this process has lowest clock then the
+				// If others are not waiting and this process has lowest clock then the
 				// lock for the critical section should be given to this section. 			
 				// if another process is asking for the lock yet it has the same clock
 				// count, then the one with the lowest process id takes precedence.
@@ -556,7 +579,10 @@ public class LibraryServer
 		return true;
 	}
 
-	private  void mainLoop()
+	/**
+	 * Main server loop.
+	 */
+	private void mainLoop()
 	{
 		// catch keyboardInterrupt
 		Runtime.getRuntime().addShutdownHook(new Thread() {
@@ -568,12 +594,13 @@ public class LibraryServer
 		/* debug("Entering mainLoop()"); */
 		while (true)
 		{
+			checkSleep();
 			checkSockets();
 		}
 	}
 
 	/**
-	 * Main loop of the server program.
+	 * Checks sockets for events.
 	 */
 	private void checkSockets()
 	{
@@ -622,7 +649,6 @@ public class LibraryServer
 			e.printStackTrace();
 			/* terminate(); */
 		}
-		// TODO: Detect keyboardinterupt and terminate.
 	}
 
 	/**
@@ -661,17 +687,26 @@ public class LibraryServer
 		Socket socket = sock.socket();
 		String ip = sock.socket().getInetAddress().getHostAddress();
 		int port = socket.getPort();
-		/* debug("getIP(): port = "+port); */
-		/* debug("getIP(): Local port = "+socket.getLocalPort()); */
-		/* if (!servers.containsKey(ip+":"+socket.getLocalPort())) */
-		/* { */
-		/* 	port = socket.getPort(); */
-		/* } else { */
-		/* 	port = socket.getLocalPort(); */
-		/* } */
 		return ip+":"+port;
 	}
 
+	/**
+	 * Checks if the messageCount is greater than the messageMax stated in the
+	 * configFile and introduces a wait for the given duration in the config file.
+	 */
+	private void checkSleep()
+	{
+		try 
+		{
+			if (messageCount > messageMax){
+				debug("Sleeping",RED);
+				this.messageCount = 0;
+				Thread.sleep(timeout);
+			}
+		} catch (InterruptedException e){
+			terminate();
+		}
+	}
 
 	/**
 	 * Returns the vector_clock in string form.
@@ -694,15 +729,23 @@ public class LibraryServer
 		if (debug) System.out.println("[*] DEBUG: "+msg);
 	}
 	
+	/**
+	 * Used to print debug messages.
+	 * @param String msg - debug message to be printed out.
+	 * @param String color - desired color for messages.
+	 */
 	private void debug(String msg, String color)
 	{
 		if (debug) System.out.println(color+"[*] DEBUG: "+msg+ENDC);
 	}
 
-
-
 	public static void main(String[] args)
 	{
-		LibraryServer s1= new LibraryServer(Integer.parseInt(args[0]));
+		try
+		{
+			LibraryServer s1= new LibraryServer(Integer.parseInt(args[0]));
+		} catch (ArrayIndexOutOfBoundsException e){
+			System.out.println("Error: Please provide a port number.");
+		}
 	}
 }

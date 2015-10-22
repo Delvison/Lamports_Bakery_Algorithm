@@ -30,8 +30,6 @@ import java.io.IOException;
  *
  * @author Delvison Castillo (delvison.castillo@sunykorea.ac.kr)
  *
- * TODO:  - Figure out clientid.
- *				- Test client with atleast one instance of server.
  */
 
 public class LibraryClient
@@ -45,6 +43,7 @@ public class LibraryClient
 	private String configFile = ".clientConfig.dat"; // config file location
 	private HashMap<String,Boolean> servers; // < [addr:status], ...>
 	private String clientID; // clientID given by server
+
 	private final String GREEN = "\033[92m";
 	private final String RED = "\033[91m";
 	private final String ENDC = "\033[0m";
@@ -118,41 +117,35 @@ public class LibraryClient
 		Collections.shuffle(srvlist);
 		for (String server : srvlist)
 		{
-			// if the server is up, attempt to connect
-			/* if (servers.get(server) != false) */
-			if (true) // always assume that a server is up
+			try
 			{
-				try
+				String[] s = server.split(":");
+				String ip = s[0];
+				int port = Integer.parseInt(s[1]);
+				host = new Socket(ip,port);
+				//debug("connect(): socket created on port "+host.getLocalPort());
+				sockOut = new PrintWriter(host.getOutputStream(),true);
+				sockIn = new BufferedReader(
+				new InputStreamReader(host.getInputStream()));
+				// send identity notification
+				sockOut.println("client");
+				// receive ACK.
+				char[] buffer = new char[64];
+				int r = sockIn.read(buffer,0,64);
+				if (r != 0) 
 				{
-					String[] s = server.split(":");
-					String ip = s[0];
-					int port = Integer.parseInt(s[1]);
-					host = new Socket(ip,port);
-					//debug("connect(): socket created on port "+host.getLocalPort());
-					sockOut = new PrintWriter(host.getOutputStream(),true);
-					sockIn = new BufferedReader(
-					new InputStreamReader(host.getInputStream()));
-					// send identity notification
-					sockOut.println("client");
-					// receive ACK.
-					//debug("connect(): attempting to connect to "+ip+":"+port);
-					char[] buffer = new char[64];
-					int r = sockIn.read(buffer,0,64);
-					if (r != 0) 
-					{
-						clientID = new String(buffer);
-						isConnected = true;
-						debug("Connected to "+getIP(host)+" as "+clientID, GREEN);
-					} else {
-						System.out.println("Failed to connect to... "+getIP(host));
-					}
-				} catch (Exception e) 
-				{
-					debug("connect(): Exception on "+server, RED);
-					servers.put(server,false);
-					/* e.printStackTrace(); */
-				} 
-			}
+					clientID = new String(buffer);
+					isConnected = true;
+					debug("Connected to "+getIP(host)+" as "+clientID, GREEN);
+				} else {
+					debug("Failed to connect to... "+getIP(host),RED);
+				}
+			} catch (Exception e) 
+			{
+				debug("connect(): Exception on "+server, RED);
+				servers.put(server,false);
+				/* e.printStackTrace(); */
+			} 
 			if (isConnected) break;
 		}
 		this.isConnected = isConnected;
@@ -162,7 +155,7 @@ public class LibraryClient
 	/**
 	 * Sends a command to the server, receives a response. 
 	 * @param String cmd - command to be sent to the server.
-	 * @return String containing the response from the server.
+	 * @return String contains the response from the server.
 	 */
 	public String sendCmd(String cmd)
 	{
@@ -194,19 +187,22 @@ public class LibraryClient
 	 */
 	private void mainLoop()
 	{
-		debug("entering mainLoop().");
+		/* debug("entering mainLoop()."); */
 		Scanner in = new Scanner(System.in);
 		String cmd = "";
 		prompt();
+
 		// catch keyboardInterrupt
 		Runtime.getRuntime().addShutdownHook(new Thread() {
 				public void run() {
 					terminate();
 				}
 		 });
+
 		while (!((cmd = in.nextLine()).equals("quit")))
 		{
 			if (cmd.equals("reconnect")) { connect(); } 
+			else if (cmd.equals("test")) { testLoop("b0",10000); } 
 			else { sendCmd(cmd); }
 				prompt();
 		}
@@ -225,9 +221,9 @@ public class LibraryClient
 			sockOut.close();
 			sockIn.close();
 		} catch (IOException e) {
-			System.exit(0);
+			return;
 		}
-		System.exit(0);
+		return;
 	}
 
 	/**
@@ -264,9 +260,26 @@ public class LibraryClient
 		if (this.debug) System.out.println("[*] DEBUG: "+msg);
 	}
 	
+	/**
+	 * Used to print debug messages.
+	 * @param String msg - debug message to be printed out
+	 */
 	private void debug(String msg, String color)
 	{
 		if (debug) System.out.println(color+"[*] DEBUG: "+msg+ENDC);
+	}
+
+	private void testLoop(String book, long milli) {
+		try {
+			while (true) {
+				sendCmd("reserve "+clientID+" "+book);
+				Thread.sleep(milli);
+				sendCmd("return "+clientID+" "+book);
+				Thread.sleep(milli);
+			}
+		}catch(Exception e){
+
+		}
 	}
 
 	public static void main(String[] args)
