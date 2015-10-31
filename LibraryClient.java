@@ -39,16 +39,20 @@ public class LibraryClient
 	private boolean debug = true; // debug flag
 	private boolean isConnected; // indicator of connection status
 	private PrintWriter sockOut; // for writing out on the socket
+	private PrintWriter output; // for writing output to a file 
 	private BufferedReader sockIn; // for reading in from the socket
 	private String configFile = ".clientConfig.dat"; // config file location
 	private HashMap<String,Boolean> servers; // < [addr:status], ...>
 	private String clientID; // clientID given by server
+	private ArrayList<String> commands;
 
 	private final String GREEN = "\033[92m";
 	private final String RED = "\033[91m";
 	private final String ENDC = "\033[0m";
 	private final String YELLOW = "\u001B[33m";
 	private final String BLUE = "\u001B[34m"; 
+
+	// file output
 
 	/**
 	 * Constructor method. Initializes the hashmap used to hold the addresses of
@@ -58,7 +62,9 @@ public class LibraryClient
 	public LibraryClient()
 	{
 		servers = new HashMap<String,Boolean>();
+		commands = new ArrayList<String>();
 		if (initialize()) {
+			if (!commands.isEmpty()) runCommands();
 			mainLoop();
 		} else {
 			System.out.println("No connections.");
@@ -89,9 +95,15 @@ public class LibraryClient
 					//debug("added server "+j);
 				}
 			}
+			// read commands
+			while (s.hasNext())	{
+				String cmd = s.nextLine();
+				commands.add(cmd);
+			}
+			s.close();
 			// connect to a random server
 		  return connect() ? true : false;
-		} catch (IOException e) 
+		} catch (Exception e) 
 		{
 			debug("initialize():File read error: "+configFile);
 			e.printStackTrace();
@@ -134,7 +146,7 @@ public class LibraryClient
 				int r = sockIn.read(buffer,0,64);
 				if (r != 0) 
 				{
-					clientID = new String(buffer);
+					clientID = new String(buffer).trim();
 					isConnected = true;
 					debug("Connected to "+getIP(host)+" as "+clientID, GREEN);
 				} else {
@@ -149,6 +161,8 @@ public class LibraryClient
 			if (isConnected) break;
 		}
 		this.isConnected = isConnected;
+		/* try { output = new PrintWriter(this.clientID+".out"); */
+		/* } catch (java.io.FileNotFoundException e) { } */
 		return isConnected;
 	}
 
@@ -166,13 +180,15 @@ public class LibraryClient
 			{
 				sockOut.println(cmd);
 				debug("sent command: "+cmd,GREEN);
-				char[] buffer = new char[64];
-				int r = sockIn.read(buffer,0,buffer.length);
-				res = new String(buffer);
-				debug("received :"+res,BLUE);
+				char[] buffer = new char[1024];
+				while (res.trim().length() <1){
+					int r = sockIn.read(buffer,0,buffer.length);
+					res = new String(buffer).trim();
+				}
+				System.out.println(BLUE+res+ENDC);
 			} catch(IOException e) 
 			{
-				e.printStackTrace();
+				debug("ERROR: RECONNECTING...",RED);
 				/* servers.put(host.getInetAddress().getHostAddress(), false); */
 				return connect() ? sendCmd(cmd) : "SYSTEM IS DOWN.";
 			}
@@ -180,6 +196,19 @@ public class LibraryClient
 			res = "ERROR: No connection."; 
 		}
 		return res;
+	}
+
+	private void runCommands()
+	{
+		System.out.println("[*] Running commands in config.");
+		try {
+			for (String cmd: commands){
+				sendCmd(cmd);
+				/* Thread.sleep(2000); */
+			}
+		} catch (Exception e){
+			e.printStackTrace();
+		}
 	}
 
 	/**
@@ -202,7 +231,7 @@ public class LibraryClient
 		while (!((cmd = in.nextLine()).equals("quit")))
 		{
 			if (cmd.equals("reconnect")) { connect(); } 
-			else if (cmd.equals("test")) { testLoop("b0",10000); } 
+			else if (cmd.equals("test")) { testLoop("b0",0); } 
 			else { sendCmd(cmd); }
 				prompt();
 		}
@@ -272,9 +301,9 @@ public class LibraryClient
 	private void testLoop(String book, long milli) {
 		try {
 			while (true) {
-				sendCmd("reserve "+clientID+" "+book);
+				sendCmd(clientID+" "+book+" reserve");
 				Thread.sleep(milli);
-				sendCmd("return "+clientID+" "+book);
+				sendCmd(clientID+" "+book+" return");
 				Thread.sleep(milli);
 			}
 		}catch(Exception e){
