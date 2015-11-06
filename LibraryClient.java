@@ -17,6 +17,9 @@ import java.io.PrintWriter;
 import java.io.BufferedReader;
 import java.io.InputStreamReader;
 import java.io.IOException;
+import java.text.DateFormat;
+import java.text.SimpleDateFormat;
+import java.util.Date;
 
 /**
  * FILE: LibraryClient.java
@@ -135,6 +138,7 @@ public class LibraryClient
 				String ip = s[0];
 				int port = Integer.parseInt(s[1]);
 				host = new Socket(ip,port);
+				/* host.setSoTimeout(6000); // time out */
 				//debug("connect(): socket created on port "+host.getLocalPort());
 				sockOut = new PrintWriter(host.getOutputStream(),true);
 				sockIn = new BufferedReader(
@@ -185,7 +189,11 @@ public class LibraryClient
 					int r = sockIn.read(buffer,0,buffer.length);
 					res = new String(buffer).trim();
 				}
-				System.out.println(BLUE+res+ENDC);
+				if (res.substring(0,4).equals("fail")){
+					System.out.println("["+getTime()+"] "+RED+res+ENDC);
+				} else {
+					System.out.println("["+getTime()+"] "+BLUE+res+ENDC);
+				}
 			} catch(IOException e) 
 			{
 				debug("ERROR: RECONNECTING...",RED);
@@ -260,7 +268,8 @@ public class LibraryClient
 	 */
 	private void prompt()
 	{
-		try{
+		try
+		{
 			String ip = host.getInetAddress().getLocalHost().getHostAddress();
 			System.out.print(ip+":"+host.getLocalPort()+" > ");
 		} catch (Exception e){
@@ -286,21 +295,25 @@ public class LibraryClient
 	 */
 	private void debug(String msg)
 	{
-		if (this.debug) System.out.println("[*] DEBUG: "+msg);
+		if (debug) System.out.println("["+getTime()+"] DEBUG: "+msg);
 	}
 	
 	/**
 	 * Used to print debug messages.
-	 * @param String msg - debug message to be printed out
+	 * @param String msg - debug message to be printed out.
+	 * @param String color - desired color for messages.
 	 */
 	private void debug(String msg, String color)
 	{
-		if (debug) System.out.println(color+"[*] DEBUG: "+msg+ENDC);
+		if (debug) System.out.println("["+getTime()+"] "+color+"DEBUG: "+msg+ENDC);
 	}
 
-	private void testLoop(String book, long milli) {
-		try {
-			while (true) {
+	private void testLoop(String book, long milli) 
+	{
+		try 
+		{
+			while (true) 
+			{
 				sendCmd(clientID+" "+book+" reserve");
 				Thread.sleep(milli);
 				sendCmd(clientID+" "+book+" return");
@@ -309,6 +322,16 @@ public class LibraryClient
 		}catch(Exception e){
 
 		}
+	}
+
+	/**
+	 * Returns the current time in HH:mm:ss
+	 */
+	private String getTime()
+	{
+		DateFormat dateFormat = new SimpleDateFormat("HH:mm:ss:SS");
+		Date date = new Date();
+		return YELLOW+dateFormat.format(date)+ENDC;
 	}
 
 	public static void main(String[] args)

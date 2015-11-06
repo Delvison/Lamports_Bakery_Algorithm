@@ -24,6 +24,9 @@ import java.io.PrintWriter;
 import java.io.BufferedReader;
 import java.io.InputStreamReader;
 import java.io.IOException;
+import java.text.DateFormat;
+import java.text.SimpleDateFormat;
+import java.util.Date;
 
 /**
  * FILE: LibraryServer.java
@@ -227,7 +230,8 @@ public class LibraryServer
 			/* debug("send(): entering with "+getIP(sock)+" MSG: "+msg); */
 			try
 			{
-				final byte[] by = msg.getBytes();
+				/* final byte[] by = msg.getBytes(); */
+				final byte[] by = makeBytes(msg,1024);
 				ByteBuffer b = ByteBuffer.wrap(by);
 				/* b.put(by); */
 				/* b.flip(); */
@@ -235,8 +239,8 @@ public class LibraryServer
 					int p = sock.write(b);
 				}
 				b.clear();
-				debug("send():Sent message to "+getIP(sock)+" >>> "+
-				msg,GREEN);
+				/* debug("send():Sent message to "+getIP(sock)+" >>> "+ */
+				/* msg,GREEN); */
 				return true;
 			} catch (IOException e)
 			{
@@ -324,17 +328,17 @@ public class LibraryServer
 			ByteBuffer buf = ByteBuffer.allocate(1024);
 			int bytesRead = sock.read(buf);
 			buf.flip();
-			recv = new String(buf.array());
-			String[] cmd = recv.trim().split(" ");
+			recv = new String(buf.array()).trim();
+			String[] cmd = recv.split(" ");
 			/* if (!servers.containsKey(ip)  || cmd[0].equals("reserve") ||  */
 			/* 		cmd[0].equals("reserve")) */
 			
 			if (clients_sock.contains(sock))
 			{
 				// receiving from a client
-				debug("recv(): received "+recv, BLUE);
+				debug("recv(): received "+recv.trim(), BLUE);
 				if (cmd.length == 3){
-					send(sock, processBook(cmd[1],cmd[2],cmd[0],true));
+					send(sock, processBook(cmd[0],cmd[1],cmd[2],true));
 				} else {
 					send(sock, "Invalid command.");	
 				}
@@ -346,7 +350,7 @@ public class LibraryServer
 				{
 					// LOCK is received when a server in the cluster requests the cs_lock
 					// LOCK <Pn> <Pn.clock>
-					debug("recv(): received LOCK from server "+sock_ip+"> "+recv,CYAN);
+					/* debug("recv(): received LOCK from server "+sock_ip+"> "+recv,CYAN); */
 					int p = Integer.parseInt(cmd[1]);
 					int clock = Integer.parseInt(cmd[2]);
 					updateClock(p,clock);
@@ -356,7 +360,7 @@ public class LibraryServer
 				{
 					// UNLOCK is received when a server in the cluster requests to release
 					// the cs_lock. UNLOCK <Pn> <Pn.clock>
-					debug("recv(): received UNLOCK from server "+sock_ip+"> "+recv,CYAN);
+					/* debug("recv(): received UNLOCK from server "+sock_ip+"> "+recv,CYAN); */
 					int p = Integer.parseInt(cmd[1]);
 					int clock = Integer.parseInt(cmd[2]);
 					updateClock(p,clock);
@@ -371,8 +375,8 @@ public class LibraryServer
 					// COMMAND is received from a server that has executed a book command.
 					// it is received and should also be executed on the receiving server
 					// in the cluster. COMMAND <Pn> <Pn.clock> (reserve|return) (Cx) (By)
-					debug("recv(): received COMMAND from server "+sock_ip+"> "+
-					recv,CYAN);
+					/* debug("recv(): received COMMAND from server "+sock_ip+"> "+ */
+					/* recv,CYAN); */
 					int p = Integer.parseInt(cmd[1]);
 					int clock = Integer.parseInt(cmd[2]);
 					String order = cmd[3];
@@ -382,17 +386,21 @@ public class LibraryServer
 					processBook(c_id , b_id, order,false);
 
 				} else if (cmd[0].equals("CLIENT_COUNT")) {
-					debug("recv(): received CLIENT_COUNT from server "+sock_ip+"> "+
-					recv,CYAN);
+					/* debug("recv(): received CLIENT_COUNT from server "+sock_ip+"> "+ */
+					/* recv,CYAN); */
 					int p = Integer.parseInt(cmd[1]);
 					int cc = Integer.parseInt(cmd[2]);
 					int clock = Integer.parseInt(cmd[3]);
 					if (cc >clientCount) clientCount = cc;
 					updateClock(p,clock);
 
+				} else if (cmd[0].equals("SOCKET_CLOSE"))
+				{
+					sock.close();
+					SelectionKey key =sock.register(selector,0);
+
 				} else {
-					debug("recv(): ERROR: received INVALID_COMMAND from server "
-					+sock_ip+ " >> "+recv,RED);
+					/* debug("recv():received from server "+sock_ip+ " >> "+recv.trim(),RED); */
 				}
 			}
 		} catch (IOException e)
@@ -447,10 +455,13 @@ public class LibraryServer
 			int max = (int) Collections.max(Arrays.asList(vector_clock));
 			vector_clock[process] = max + 1;
 			messageCount ++;
+			debug(getClocks(),CYAN);
 		} else {
-			if(vector_clock[process] < val) vector_clock[process] = val;
+			if(vector_clock[process] < val) {
+				vector_clock[process] = val;
+				debug(getClocks(),CYAN);
+			}
 		}
-		debug(getClocks(),CYAN);
 	}
 
 	/**
@@ -469,7 +480,7 @@ public class LibraryServer
 	private String processBook(String clientID, String bookID, String cmd, 
 	boolean needLock)
 	{
-		/* debug("processBook():"+cmd+" "+clientID+" "+bookID); */
+		debug("processBook(): ENTERING: "+cmd+" "+clientID+" "+bookID);
 		String ret = "fail "+clientID+" "+bookID;
 		// ask for lock for the critical section
 		if (needLock) lock(this.pid);
@@ -504,6 +515,7 @@ public class LibraryServer
 				broadcast("COMMAND "+this.pid+" "+vector_clock[this.pid]+
 				" "+cmd+" "+clientID+" "+bookID);
 			if (needLock) unlock(this.pid);
+			debug(bookStatus(),CYAN);
 		}
 		return ret;
 	}
@@ -517,9 +529,10 @@ public class LibraryServer
 		if (this.pid == process) { 
 			debug("lock(): setting lock for process "+process,YELLOW);
 			broadcast("LOCK "+this.pid+" "+vector_clock[this.pid]);
-		} else {
-			debug("lock(): setting lock for process "+process,CYAN);
-		}
+		} 
+		/* else { */
+		/* 	debug("lock(): setting lock for process "+process,CYAN); */
+		/* } */
 		cs_flag[process] = true;
 	}
 
@@ -534,9 +547,10 @@ public class LibraryServer
 		if (this.pid == process) {
 			debug("unlock(): unlocking process "+process,YELLOW);
 			broadcast("UNLOCK "+this.pid+" "+vector_clock[this.pid]);
-		} else {
-			debug("unlock(): unlocking process "+process,CYAN);
-		}
+		} 
+		/* else { */
+		/* 	debug("unlock(): unlocking process "+process,CYAN); */
+		/* } */
 	}
 	
 	/**
@@ -545,6 +559,7 @@ public class LibraryServer
 	 */
 	private boolean waitForLock()
 	{
+		long startTime = System.nanoTime();
 		debug("waitForLock(): entering.",YELLOW);
 		boolean lock = true;
 		while (lock)
@@ -572,10 +587,12 @@ public class LibraryServer
 				lock = false;
 		  } else {
 				// Else, check sockets for updates.
-				checkSockets();
+				checkSockets(true);
 			}
 		}
-		debug("waitForLock(): lock received.",YELLOW);
+		long endTime = System.nanoTime();
+		debug("waitForLock(): lock received.("+(endTime-startTime)/1000000.0+" ms)"
+		,YELLOW);
 		return true;
 	}
 
@@ -595,14 +612,14 @@ public class LibraryServer
 		while (true)
 		{
 			checkSleep();
-			checkSockets();
+			checkSockets(false);
 		}
 	}
 
 	/**
 	 * Checks sockets for events.
 	 */
-	private void checkSockets()
+	private void checkSockets(boolean waiting)
 	{
 		try 
 		{
@@ -641,11 +658,11 @@ public class LibraryServer
 				}
 
 				// remove key from selected keys after processing.
-				keyIterator.remove();
+				if (!waiting) keyIterator.remove();
 			}
 		} catch (Exception e) 
 		{
-			debug("mainLoop(): Exception ");
+			debug("mainLoop(): Exception ",RED);
 			e.printStackTrace();
 			/* terminate(); */
 		}
@@ -662,6 +679,7 @@ public class LibraryServer
 			// close all server sockets
 			for (SocketChannel sock : servers_sock){
 				System.out.println("Closing server connection to..."+getIP(sock));
+				send(sock,"SOCKET_CLOSE");
 				sock.close();
 			}
 			// close all client sockets 
@@ -701,11 +719,20 @@ public class LibraryServer
 			if (messageCount > messageMax){
 				debug("Sleeping",RED);
 				this.messageCount = 0;
+				
+				/* for (SocketChannel sock : clients_sock){ */
+				/* 	System.out.println("Closing client connection to..."+getIP(sock)); */
+				/* 	sock.close(); */
+				/* } */
+
 				Thread.sleep(timeout);
 			}
 		} catch (InterruptedException e){
 			terminate();
 		}
+		/* } catch (IOException e) { */
+		/* 	terminate(); */
+		/* } */
 	}
 
 	/**
@@ -721,12 +748,49 @@ public class LibraryServer
 	}
 
 	/**
+	 * Takes in a message and a desired size in bytes, then returns a byte array
+	 * that is padded with spaces at the end if the size of the message is less
+	 * than the specified size.
+	 * @param String message - Desired message to convert to a byte array.
+	 * @param int size - Desired size of the byte array.
+	 * @return byte[] - Resulting byte array containing message and padded with
+	 * spaces.
+	 */
+	public static byte[] makeBytes(String message, int size)
+	{
+		byte[] ret = new byte[size];
+		System.arraycopy(message.getBytes(),0,ret,0,message.getBytes().length);
+		String padder = "#";
+		for (int i=message.getBytes().length; i<ret.length; i++)
+			ret[i] = (byte) 32; // spaces
+		return ret;
+	}
+
+	/**
+	 * returns printout of the status of books
+	 */
+	private String bookStatus()
+	{
+		String ret = "BOOKS: [ ";
+		for (int i=0;i<books.length;i++)
+		{
+			if (books[i][1].equals("free")){
+				ret+= GREEN+books[i][1]+" "+ENDC;
+			} else {
+				ret+= RED+books[i][2]+" "+ENDC;
+			}
+		}
+		ret+= " ]";
+		return ret;
+	}
+
+	/**
 	 * Used to print debug messages.
 	 * @param String msg - debug message to be printed out
 	 */
 	private void debug(String msg)
 	{
-		if (debug) System.out.println("[*] DEBUG: "+msg);
+		if (debug) System.out.println("["+getTime()+"] DEBUG: "+msg);
 	}
 	
 	/**
@@ -736,7 +800,17 @@ public class LibraryServer
 	 */
 	private void debug(String msg, String color)
 	{
-		if (debug) System.out.println(color+"[*] DEBUG: "+msg+ENDC);
+		if (debug) System.out.println("["+getTime()+"] "+color+"DEBUG: "+msg+ENDC);
+	}
+
+	/**
+	 * Returns the current time in HH:mm:ss
+	 */
+	private String getTime()
+	{
+		DateFormat dateFormat = new SimpleDateFormat("HH:mm:ss:SS");
+		Date date = new Date();
+		return YELLOW+dateFormat.format(date)+ENDC;
 	}
 
 	public static void main(String[] args)
