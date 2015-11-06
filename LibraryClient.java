@@ -137,8 +137,8 @@ public class LibraryClient
 				String[] s = server.split(":");
 				String ip = s[0];
 				int port = Integer.parseInt(s[1]);
-				host = new Socket(ip,port);
-				/* host.setSoTimeout(6000); // time out */
+				host = new Socket();
+				host.connect(new InetSocketAddress(ip,port),3000);
 				//debug("connect(): socket created on port "+host.getLocalPort());
 				sockOut = new PrintWriter(host.getOutputStream(),true);
 				sockIn = new BufferedReader(
@@ -158,7 +158,7 @@ public class LibraryClient
 				}
 			} catch (Exception e) 
 			{
-				debug("connect(): Exception on "+server, RED);
+				/* debug("connect(): Exception on "+server, RED); */
 				servers.put(server,false);
 				/* e.printStackTrace(); */
 			} 
@@ -185,18 +185,23 @@ public class LibraryClient
 				sockOut.println(cmd);
 				debug("sent command ("+getIP(host)+"): "+cmd,GREEN);
 				char[] buffer = new char[1024];
-				while (res.trim().length() <1){
+				long startTime = System.nanoTime();
+				while (res.trim().length() <1 ){
 					int r = sockIn.read(buffer,0,buffer.length);
+					host.setSoTimeout(3000); // time out
 					res = new String(buffer).trim();
+					if ((System.nanoTime() - startTime)/1000000 >= 5000){
+						throw new java.io.IOException();
+					}
 				}
 				if (res.substring(0,4).equals("fail")){
 					System.out.println("["+getTime()+"] "+RED+res+ENDC);
 				} else {
 					System.out.println("["+getTime()+"] "+BLUE+res+ENDC);
 				}
-			} catch(IOException e) 
+			} catch(Exception e) 
 			{
-				debug("ERROR: RECONNECTING...",RED);
+				debug("RECONNECTING...",RED);
 				/* servers.put(host.getInetAddress().getHostAddress(), false); */
 				return connect() ? sendCmd(cmd) : "SYSTEM IS DOWN.";
 			}

@@ -533,7 +533,7 @@ public class LibraryServer
 	private void lock(int process)
 	{
 		if (this.pid == process) { 
-			debug("lock(): setting lock for process "+process,YELLOW);
+			/* debug("lock(): setting lock for process "+process,YELLOW); */
 			broadcast("LOCK "+this.pid+" "+vector_clock[this.pid]);
 		} 
 		/* else { */
@@ -551,7 +551,7 @@ public class LibraryServer
 		cs_flag[process] = false;
 		updateClock(process, vector_clock[process]);
 		if (this.pid == process) {
-			debug("unlock(): unlocking process "+process,YELLOW);
+			/* debug("unlock(): unlocking process "+process,YELLOW); */
 			broadcast("UNLOCK "+this.pid+" "+vector_clock[this.pid]);
 		} 
 		/* else { */
@@ -566,7 +566,7 @@ public class LibraryServer
 	private boolean waitForLock()
 	{
 		long startTime = System.nanoTime();
-		debug("waitForLock(): entering.",YELLOW);
+		/* debug("waitForLock(): entering.",YELLOW); */
 		boolean lock = true;
 		while (lock)
 		{
@@ -593,13 +593,13 @@ public class LibraryServer
 				lock = false;
 		  } else {
 				// Else, check sockets for updates.
-				debug("OTHERS WAITING",RED);
+				/* debug("OTHERS WAITING",RED); */
 				checkSockets();
 			}
 		}
 		long endTime = System.nanoTime();
-		debug("waitForLock(): lock received.("+(endTime-startTime)/1000000.0+" ms)"
-		,YELLOW);
+		/* debug("waitForLock(): lock received.("+(endTime-startTime)/1000000.0+" ms)" */
+		/* ,YELLOW); */
 		return true;
 	}
 
@@ -735,19 +735,20 @@ public class LibraryServer
 				debug("Sleeping",RED);
 				this.messageCount = 0;
 				
-				/* for (SocketChannel sock : clients_sock){ */
-				/* 	System.out.println("Closing client connection to..."+getIP(sock)); */
-				/* 	sock.close(); */
-				/* } */
+				for (SocketChannel sock : clients_sock){
+					if (sock.isConnected()){
+						System.out.println("Closing client connection to..."+getIP(sock));
+						sock.close();
+					}
+				}
 
 				Thread.sleep(timeout);
 			}
 		} catch (InterruptedException e){
 			terminate();
+		} catch (IOException e) {
+			terminate();
 		}
-		/* } catch (IOException e) { */
-		/* 	terminate(); */
-		/* } */
 	}
 
 	/**
