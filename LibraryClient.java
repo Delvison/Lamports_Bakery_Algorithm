@@ -183,7 +183,7 @@ public class LibraryClient
 			try 
 			{
 				sockOut.println(cmd);
-				debug("sent command: "+cmd,GREEN);
+				debug("sent command ("+getIP(host)+"): "+cmd,GREEN);
 				char[] buffer = new char[1024];
 				while (res.trim().length() <1){
 					int r = sockIn.read(buffer,0,buffer.length);
@@ -314,10 +314,13 @@ public class LibraryClient
 		{
 			while (true) 
 			{
-				sendCmd(clientID+" "+book+" reserve");
-				Thread.sleep(milli);
-				sendCmd(clientID+" "+book+" return");
-				Thread.sleep(milli);
+				for (int i=0;i<10;i++)
+				{
+					sendCmd(clientID+" b"+i+" reserve");
+					Thread.sleep(milli);
+					sendCmd(clientID+" b"+i+" return");
+					Thread.sleep(milli);
+				}
 			}
 		}catch(Exception e){
 

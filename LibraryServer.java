@@ -370,6 +370,10 @@ public class LibraryServer
 					// SYNC is received when a server asks for all book data.
 					// SYNC <Pn> <Pn.clock>
 					debug("recv(): received SYNC from server "+sock_ip,CYAN);
+					String tmp = bookDataDump();
+					String[] cmds = tmp.split(";");
+					for (int i=0;i<cmds.length;i++)
+						send(sock, cmds[i]);
 
 				} else if (cmd[0].equals("COMMAND")) {
 					// COMMAND is received from a server that has executed a book command.
@@ -422,10 +426,12 @@ public class LibraryServer
 
 		for (int i=0; i<books.length;i++)
 		{
-			if (books[i][1].equals("free")) 
-				data+= books[i][0]+" "+books[i][1]+"null;";
+			data += "COMMAND "+this.pid+" "+vector_clock[this.pid]+ " ";
+
+			/* if (books[i][1].equals("free"))  */
+			/* 	data+= books[i][0]+" "+books[i][1]+"null;"; */
 			if (books[i][1].equals("reserved")) 
-				data+= books[i][0]+" "+books[i][1]+" "+books[i][2]+";";
+				data+= books[i][2]+" "+books[i][0]+" reserve;";
 		}
 		return data;
 	}
@@ -587,7 +593,8 @@ public class LibraryServer
 				lock = false;
 		  } else {
 				// Else, check sockets for updates.
-				checkSockets(true);
+				debug("OTHERS WAITING",RED);
+				checkSockets();
 			}
 		}
 		long endTime = System.nanoTime();
@@ -612,14 +619,14 @@ public class LibraryServer
 		while (true)
 		{
 			checkSleep();
-			checkSockets(false);
+			checkSockets();
 		}
 	}
 
 	/**
 	 * Checks sockets for events.
 	 */
-	private void checkSockets(boolean waiting)
+	private void checkSockets()
 	{
 		try 
 		{
@@ -628,9 +635,17 @@ public class LibraryServer
 			selector.select();
 			Set<SelectionKey> selectedKeys = selector.selectedKeys();
 			Iterator<SelectionKey> keyIterator = selectedKeys.iterator();
-			while (keyIterator.hasNext())
+			// NOTE: converting to arraylist here to avoid
+			// ConcurrentModificationException on the Iterator.
+			ArrayList<SelectionKey> copy = new ArrayList<SelectionKey>();
+			while (keyIterator.hasNext()){
+				copy.add(keyIterator.next());
+				keyIterator.remove();
+			}
+			/* while (keyIterator.hasNext()) */
+			for (SelectionKey key: copy)
 			{
-				SelectionKey key = keyIterator.next();
+				/* SelectionKey key = keyIterator.next(); */
 
 				if(key.isAcceptable()) 
 				{
@@ -658,7 +673,7 @@ public class LibraryServer
 				}
 
 				// remove key from selected keys after processing.
-				if (!waiting) keyIterator.remove();
+				/* keyIterator.remove(); */
 			}
 		} catch (Exception e) 
 		{
