@@ -62,8 +62,9 @@ public class LibraryClient
 	 * the servers as well as their status. Calls initialize. If initialize is
 	 * successful, then the program enters its main loop.
 	 */
-	public LibraryClient()
+	public LibraryClient(String clientID)
 	{
+		this.clientID = clientID;
 		servers = new HashMap<String,Boolean>();
 		commands = new ArrayList<String>();
 		if (initialize()) {
@@ -126,6 +127,7 @@ public class LibraryClient
 		boolean isConnected = false;
 		this.isConnected = isConnected;
 		// FIXME: warning here with typecast
+		@SuppressWarnings("unchecked") // Just for this one statement
 		List<String> srvlist = new ArrayList(
 		Arrays.asList(servers.keySet().toArray()));
 		// randomize the server list
@@ -150,9 +152,9 @@ public class LibraryClient
 				int r = sockIn.read(buffer,0,64);
 				if (r != 0) 
 				{
-					clientID = new String(buffer).trim();
+					//clientID = new String(buffer).trim();
 					isConnected = true;
-					debug("Connected to "+getIP(host)+" as "+clientID, GREEN);
+					debug("Connected to "+getIP(host)+" as "+clientID, YELLOW);
 				} else {
 					debug("Failed to connect to... "+getIP(host),RED);
 				}
@@ -194,7 +196,8 @@ public class LibraryClient
 						throw new java.io.IOException();
 					}
 				}
-				if (res.substring(0,4).equals("fail")){
+				if (res.substring(0,4).equals("fail"))
+				{
 					System.out.println("["+getTime()+"] "+RED+res+ENDC);
 				} else {
 					System.out.println("["+getTime()+"] "+BLUE+res+ENDC);
@@ -344,6 +347,11 @@ public class LibraryClient
 
 	public static void main(String[] args)
 	{
-		LibraryClient c1= new LibraryClient();
+		try
+		{
+			LibraryClient c1= new LibraryClient(args[0]);
+		} catch (ArrayIndexOutOfBoundsException e){
+			System.out.println("Error: Please provide a client ID. Example: c1.");
+		}
 	}
 }

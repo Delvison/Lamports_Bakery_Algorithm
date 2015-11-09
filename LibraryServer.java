@@ -48,8 +48,6 @@ import java.util.Date;
  *
  * @author Delvison Castillo (delvison.castillo@sunykorea.ac.kr)
  *
- * TODO:  - fix problem of mixed up messages when send rate is too fast by
- *					framing each message sent.
  */
 public class LibraryServer
 
@@ -77,6 +75,7 @@ public class LibraryServer
 	private int messageCount;
 	private int timeout; // time in milliseconds to become unresponsive
 	
+	// Colors for stdout
 	private final String GREEN = "\033[92m";
 	private final String RED = "\033[91m";
 	private final String ENDC = "\033[0m";
@@ -85,10 +84,10 @@ public class LibraryServer
 	private final String CYAN = "\u001B[36m";
 
 	/**
-	 * Constructor method. Initializes servers and clients data structures, calls
-	 * initialize method, enters the programs mainloop if initialize is
-	 * successful.
-	 */
+	* Initializes servers and clients data structures, calls
+	* initialize method, enters the programs mainloop if initialize is
+	* successful.
+	*/
 	public LibraryServer(int port)
 	{
 		this.port = port;
@@ -97,7 +96,7 @@ public class LibraryServer
 		clients_sock = new ArrayList<SocketChannel>();
 		servers_sock = new ArrayList<SocketChannel>();
 		if (initialize()) {
-			// TODO: synchronize book data
+			// TODO: synchronize book data upon startup
 			mainLoop();
 		} else {
 			terminate();
@@ -105,9 +104,9 @@ public class LibraryServer
 	}
 
 	/**
-	 * Initializes the server by reading from the data file. 
-	 * @return Boolean indicating whether or not initialization was successful.
-	 */
+	* Initializes the server by reading from the data file. 
+	* @return Boolean indicating whether or not initialization was successful.
+	*/
 	private boolean initialize()
 	{
 		try 
@@ -183,9 +182,9 @@ public class LibraryServer
 	}
 
 	/**
-	 * Creates socket connections to all other servers in the distributed system.
-	 * @return Boolean indicating success.
-	 */
+	* Creates socket connections to all other servers in the distributed system.
+	* @return Boolean indicating success.
+	*/
 	private boolean connectToServers()
 	{
 		for (Map.Entry<String,Boolean> server : servers.entrySet())
@@ -217,11 +216,11 @@ public class LibraryServer
 	}
 
 	/**
-	 * Sends a message on the given SocketChannel.
-	 * @param SocketChannel sock - desired socketchannel to send message out on.
-	 * @param String msg - desired message to be sent.
-	 * @return Boolean indicating whether the sent message was successful.
-	 */
+	* Sends a message on the given SocketChannel.
+	* @param SocketChannel sock - desired socketchannel to send message out on.
+	* @param String msg - desired message to be sent.
+	* @return Boolean indicating whether the sent message was successful.
+	*/
 	private boolean send(SocketChannel sock,String msg) 
 	{
 		/* if(!getIP(sock).equals("127.0.0.1:"+port))  */
@@ -264,13 +263,13 @@ public class LibraryServer
 	}
 
 	/**
-	 * Receives a connection from a client or a server, sends appropriate ACK and
-	 * adds the socket to the appropriate data structure.
-	 * @param Socket clientCh - The newly created socket produced from 
-	 * ServerSocketChannel.accept().
-	 * @return Boolean indicating whether or not the client was successfully
-	 * added.
-	 */
+	* Receives a connection from a client or a server, sends appropriate ACK and
+	* adds the socket to the appropriate data structure.
+	* @param Socket clientCh - The newly created socket produced from 
+	* ServerSocketChannel.accept().
+	* @return Boolean indicating whether or not the client was successfully
+	* added.
+	*/
 	private boolean connectClient(SocketChannel clientCh)
 	{
 			/* debug("connectClient(): entering with "+getIP(clientCh)); */
@@ -313,10 +312,10 @@ public class LibraryServer
 	}
 
 	/**
-	 * Receives a command on the socket from a client or server.
-	 * @param SocketChannel sock - SocketChannel receiving from.
-	 * @return String containing the reply to be sent to the client.
-	 */
+	* Receives a command on the socket from a client or server.
+	* @param SocketChannel sock - SocketChannel receiving from.
+	* @return String containing the reply to be sent to the client.
+	*/
 	private String recv(SocketChannel sock) 
 	{
 		String ip = getIP(sock);
@@ -417,9 +416,9 @@ public class LibraryServer
 	}
 
 	/**
-	 * Collects the status of the books each seperated by a colon.
-	 * @return String Indicates the status of each book.
-	 */
+	* Collects the status of the books each seperated by a colon.
+	* @return String Indicates the status of each book.
+	*/
 	private String bookDataDump()
 	{
 		String data = "";
@@ -437,9 +436,9 @@ public class LibraryServer
 	}
 
 	/**
-	 * Broadcasts a message to all servers in the cluster.
-	 * @param String msg - Message to be broadcasted.
-	 */
+	* Broadcasts a message to all servers in the cluster.
+	* @param String msg - Message to be broadcasted.
+	*/
 	private void broadcast(String msg)
 	{
 		/* debug("broadcast(): MESSAGE = "+msg); */
@@ -479,8 +478,8 @@ public class LibraryServer
 	*	@param String cmd - command being submitted (reserve or return).
 	*	@param boolean needLock - inidicates whether or not the process requires a
 	*	lock for the critical section. The difference is updating books from a
-	*	client request, which requires a lock, to just synchronizing with other
-	*	servers.
+	*	client request which requires a lock, or just synchronizing with other
+	*	servers which does not require a lock.
 	*	@return String response to command submitted.
 	*/
 	private String processBook(String clientID, String bookID, String cmd, 
@@ -527,9 +526,9 @@ public class LibraryServer
 	}
 
 	/**
-	 * Sets lock for a given process.
-	 * @param int process - process asking for the mutex lock
-	 */
+	* Sets lock for a given process.
+	* @param int process - process asking for the mutex lock
+	*/
 	private void lock(int process)
 	{
 		if (this.pid == process) { 
@@ -543,9 +542,9 @@ public class LibraryServer
 	}
 
 	/**
-	 * Releases lock for a given process.
-	 * @param int process - process asking to release lock.
-	 */
+	* Releases lock for a given process.
+	* @param int process - process asking to release lock.
+	*/
 	private void unlock(int process)
 	{
 		cs_flag[process] = false;
@@ -560,9 +559,11 @@ public class LibraryServer
 	}
 	
 	/**
-	 * Waits until all other processes with a lower clock count execute and set
-	 * their cs_flag to false.
-	 */
+	* Waits until all other processes with a lower clock count execute and set
+	* their cs_flag to false.
+	* @return Boolean - indicates whether or not the lock was successfully 
+	* received.
+	*/
 	private boolean waitForLock()
 	{
 		long startTime = System.nanoTime();
@@ -604,28 +605,8 @@ public class LibraryServer
 	}
 
 	/**
-	 * Main server loop.
-	 */
-	private void mainLoop()
-	{
-		// catch keyboardInterrupt
-		Runtime.getRuntime().addShutdownHook(new Thread() {
-				public void run() {
-					terminate();
-				}
-		 });
-
-		/* debug("Entering mainLoop()"); */
-		while (true)
-		{
-			checkSleep();
-			checkSockets();
-		}
-	}
-
-	/**
-	 * Checks sockets for events.
-	 */
+	* Checks sockets for events.
+	*/
 	private void checkSockets()
 	{
 		try 
@@ -684,8 +665,8 @@ public class LibraryServer
 	}
 
 	/**
-	 * Terminates the program.
-	 */
+	* Terminates the program.
+	*/
 	public void terminate()
 	{
 		try
@@ -699,7 +680,7 @@ public class LibraryServer
 			}
 			// close all client sockets 
 			for (SocketChannel sock : clients_sock){
-				System.out.println("Closing client connection to..."+getIP(sock));
+				/* System.out.println("Closing client connection to..."+getIP(sock)); */
 				sock.close();
 			}
 			System.out.println("Program terminated.");
@@ -711,10 +692,10 @@ public class LibraryServer
 	}
 
 	/**
-	 * Returns the IP address and port of of a given SocketChannel.
-	 * @param SocketChannel sock - the desired SocketChannel to the ip address for
-	 * @return String IP of the SocketChannel given.
-	 */
+	* Returns the IP address and port of of a given SocketChannel.
+	* @param SocketChannel sock - the desired SocketChannel to the ip address for
+	* @return String - IP of the SocketChannel given.
+	*/
 	private String getIP(SocketChannel sock)
 	{
 		Socket socket = sock.socket();
@@ -724,37 +705,45 @@ public class LibraryServer
 	}
 
 	/**
-	 * Checks if the messageCount is greater than the messageMax stated in the
-	 * configFile and introduces a wait for the given duration in the config file.
-	 */
+	* Checks if the messageCount is greater than the messageMax stated in the
+	* configFile and introduces a wait for the given duration in the config file
+	* while also cutting connection to all its clients forcing them to reconnect
+	* with another node in the cluster.
+	*/
 	private void checkSleep()
 	{
-		try 
+		if (countServers() >= 1)
 		{
-			if (messageCount > messageMax){
-				debug("Sleeping",RED);
-				this.messageCount = 0;
-				
-				for (SocketChannel sock : clients_sock){
-					if (sock.isConnected()){
-						System.out.println("Closing client connection to..."+getIP(sock));
-						sock.close();
+			try 
+			{
+				if (messageCount > messageMax)
+				{
+					debug("Sleeping",RED);
+					this.messageCount = 0;
+					// FIXME: remove socket from the arraylist and avoid concurrent
+					// modification exception.
+					for (SocketChannel sock : clients_sock)
+					{
+						if (sock.isConnected())
+						{
+							/* System.out.println("Closing client connection to..."+getIP(sock)); */
+							sock.close();
+						}
 					}
+					Thread.sleep(timeout);
 				}
-
-				Thread.sleep(timeout);
+			} catch (InterruptedException e){
+				terminate();
+			} catch (IOException e) {
+				terminate();
 			}
-		} catch (InterruptedException e){
-			terminate();
-		} catch (IOException e) {
-			terminate();
 		}
 	}
 
 	/**
-	 * Returns the vector_clock in string form.
-	 * @return String - vector_clock in String form.
-	 */
+	* Returns the vector_clock in string form.
+	* @return String - vector_clock in String form.
+	*/
 	private String getClocks()
 	{
 		String ret = "Clocks: [  ";
@@ -764,14 +753,14 @@ public class LibraryServer
 	}
 
 	/**
-	 * Takes in a message and a desired size in bytes, then returns a byte array
-	 * that is padded with spaces at the end if the size of the message is less
-	 * than the specified size.
-	 * @param String message - Desired message to convert to a byte array.
-	 * @param int size - Desired size of the byte array.
-	 * @return byte[] - Resulting byte array containing message and padded with
-	 * spaces.
-	 */
+	* Takes in a message and a desired size in bytes, then returns a byte array
+	* that is padded with spaces at the end if the size of the message is less
+	* than the specified size.
+	* @param String message - Desired message to convert to a byte array.
+	* @param int size - Desired size of the byte array.
+	* @return byte[] - Resulting byte array containing message and padded with
+	* spaces.
+	*/
 	public static byte[] makeBytes(String message, int size)
 	{
 		byte[] ret = new byte[size];
@@ -783,8 +772,8 @@ public class LibraryServer
 	}
 
 	/**
-	 * returns printout of the status of books
-	 */
+	* returns printout of the status of books
+	*/
 	private String bookStatus()
 	{
 		String ret = "BOOKS: [ ";
@@ -801,32 +790,78 @@ public class LibraryServer
 	}
 
 	/**
-	 * Used to print debug messages.
-	 * @param String msg - debug message to be printed out
-	 */
+	* Used to print debug messages.
+	* @param String msg - debug message to be printed out
+	*/
 	private void debug(String msg)
 	{
 		if (debug) System.out.println("["+getTime()+"] DEBUG: "+msg);
 	}
 	
 	/**
-	 * Used to print debug messages.
-	 * @param String msg - debug message to be printed out.
-	 * @param String color - desired color for messages.
-	 */
+	* Used to print debug messages.
+	* @param String msg - debug message to be printed out.
+	* @param String color - desired color for messages.
+	*/
 	private void debug(String msg, String color)
 	{
 		if (debug) System.out.println("["+getTime()+"] "+color+"DEBUG: "+msg+ENDC);
 	}
 
 	/**
-	 * Returns the current time in HH:mm:ss
-	 */
+	* Returns the current time in HH:mm:ss
+	*/
 	private String getTime()
 	{
 		DateFormat dateFormat = new SimpleDateFormat("HH:mm:ss:SS");
 		Date date = new Date();
 		return YELLOW+dateFormat.format(date)+ENDC;
+	}
+
+
+	/**
+	* Counts how many servers are connected to this node.
+	* @return int - indicates how many servers are connected to this node.
+	*/
+	private int countServers()
+	{
+		int c = 0;
+		for (SocketChannel sock : servers_sock){
+			if (sock.isConnected()){
+				c++;
+			}
+		}
+		return c;
+	}
+
+
+	/**
+	* Main server loop.
+	*/
+	private void mainLoop()
+	{
+		// catch keyboardInterrupt
+		Runtime.getRuntime().addShutdownHook(new Thread() {
+				public void run() {
+					terminate();
+				}
+		 });
+		/* debug("Entering mainLoop()"); */
+		while (true)
+		{
+			checkSleep();
+			checkSockets();
+			/* for (SocketChannel sock : clients_sock){ */
+			/* 	if (!sock.isConnected()){ */
+			/* 		clients_sock.remove(sock); */
+			/* 	} */
+			/* } */
+			/* for (SocketChannel sock : servers_sock){ */
+			/* 	if (!sock.isConnected()){ */
+			/* 		clients_sock.remove(sock); */
+			/* 	} */
+			/* } */
+		}
 	}
 
 	public static void main(String[] args)
