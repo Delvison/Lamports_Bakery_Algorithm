@@ -44,7 +44,7 @@ public class LibraryClient
 	private PrintWriter sockOut; // for writing out on the socket
 	private PrintWriter output; // for writing output to a file 
 	private BufferedReader sockIn; // for reading in from the socket
-	private String configFile = ".clientConfig.dat"; // config file location
+	private String configFile = "clientConfig.dat"; // config file location
 	private HashMap<String,Boolean> servers; // < [addr:status], ...>
 	private String clientID; // clientID given by server
 	private ArrayList<String> commands;
@@ -154,7 +154,7 @@ public class LibraryClient
 				{
 					//clientID = new String(buffer).trim();
 					isConnected = true;
-					debug("Connected to "+getIP(host)+" as "+clientID, YELLOW);
+					/* debug("Connected to "+getIP(host)+" as "+clientID, YELLOW); */
 				} else {
 					debug("Failed to connect to... "+getIP(host),RED);
 				}

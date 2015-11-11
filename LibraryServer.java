@@ -57,7 +57,7 @@ public class LibraryServer
 	private HashMap<String,Boolean> servers; // < [addr:status], > (unneccesary)
 	private ArrayList<SocketChannel> clients_sock; // client SocketChannels
 	private ArrayList<SocketChannel> servers_sock; // server SocketChannels
-	private String configFile = ".serverConfig.dat"; // configuration file
+	private String configFile = "serverConfig.dat"; // configuration file
 	private ServerSocketChannel serverSocketCh; // server socket
 	private File f; // configuration file object
 	private Selector selector; // for asynchronous I/O
@@ -138,7 +138,7 @@ public class LibraryServer
 
 			// initialize books
 			this.bookNum = s.nextInt();
-			debug("amount of books: "+bookNum);
+			/* debug("amount of books: "+bookNum); */
 			books = new String[bookNum][3];
 			for (int i=0;i<bookNum;i++)
 			{
@@ -154,7 +154,7 @@ public class LibraryServer
 					if (Integer.parseInt(j.split(":")[1]) == this.port) 
 					{
 						this.pid = i-1; // set process ID
-						debug("PID == "+pid,CYAN);
+						/* debug("PID == "+pid,CYAN); */
 					} else {
 						servers.put(j, true);
 					}
@@ -283,7 +283,7 @@ public class LibraryServer
 				// client is connecting
 				if (recv.equals("client") && send(clientCh, "c"+clientCount))
 				{
-					debug("connectClient(): client connected "+getIP(clientCh));
+					debug("connectClient(): client connected "+getIP(clientCh),YELLOW);
 					clients_sock.add(clientCh);
 					clientCh.configureBlocking(false);
 					SelectionKey key =clientCh.register(selector,clientCh.validOps());
@@ -485,7 +485,7 @@ public class LibraryServer
 	private String processBook(String clientID, String bookID, String cmd, 
 	boolean needLock)
 	{
-		debug("processBook(): ENTERING: "+cmd+" "+clientID+" "+bookID);
+		/* debug("processBook(): ENTERING: "+cmd+" "+clientID+" "+bookID); */
 		String ret = "fail "+clientID+" "+bookID;
 		// ask for lock for the critical section
 		if (needLock) lock(this.pid);
@@ -511,11 +511,11 @@ public class LibraryServer
 					}
 				}
 			}
-			if (needLock){
-				debug("processBook(): PROCESSING "+ret);
-			} else {
-				debug("processBook(): SYNCHRONIZING "+ret,CYAN);
-			}
+			/* if (needLock){ */
+			/* 	debug("processBook(): PROCESSING "+ret); */
+			/* } else { */
+			/* 	debug("processBook(): SYNCHRONIZING "+ret,CYAN); */
+			/* } */
 			if (needLock && !ret.substring(0,4).equals("fail")) 
 				broadcast("COMMAND "+this.pid+" "+vector_clock[this.pid]+
 				" "+cmd+" "+clientID+" "+bookID);
